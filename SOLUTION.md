@@ -1,9 +1,11 @@
 # tZERO Secondary Marketplace Assessment
 
+Video Demo Link: https://www.loom.com/share/d8a46e084ea34c24b9fb832a935ca81a
+
 ## Overview
 This implementation delivers a transaction-safe secondary marketplace on top of the provided Next.js 14, MUI, and SQLite starter. The finished system supports asset discovery, live executable order books, limit order placement and cancellation, trading portfolio tracking, and real-time UI refresh through polling.
 
-## Key Technical Decisions
+## Technical Decisions
 1. **Precision policy**
    All trading arithmetic in the Node layer uses `decimal.js` with explicit fixed-point normalization. Prices and cash notionals are normalized to 5 decimal places, and all rounding uses `ROUND_HALF_UP`. This avoids floating-point drift during balance checks, cash settlement, and weighted average cost updates.
 
