@@ -26,7 +26,7 @@ describe('useAggregatedPortfolio snapshot builder', () => {
 
     expect(snapshot.globalNetWorth).toBe(3000.3)
     expect(snapshot.totalCash).toBe(1500.3)
-    expect(snapshot.secondaryEquity).toBe(2000.2)
+    expect(snapshot.totalInvested).toBe(1500)
     expect(snapshot.wallets.lockedTrading).toBe(125.05)
     expect(snapshot.wallets.availableTrading).toBe(375.15)
     expect(snapshot.isError).toBe(false)
@@ -41,7 +41,7 @@ describe('useAggregatedPortfolio snapshot builder', () => {
 
     expect(snapshot.globalNetWorth).toBe(0)
     expect(snapshot.totalCash).toBe(0)
-    expect(snapshot.secondaryEquity).toBe(0)
+    expect(snapshot.totalInvested).toBe(0)
     expect(snapshot.wallets.banking).toBe(0)
     expect(snapshot.wallets.tradingCash).toBe(0)
     expect(snapshot.isError).toBe(true)

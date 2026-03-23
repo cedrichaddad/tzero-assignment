@@ -23,7 +23,7 @@ export type AggregatedPortfolioErrors = {
 export type AggregatedPortfolioSnapshot = {
   globalNetWorth: number
   totalCash: number
-  secondaryEquity: number
+  totalInvested: number
   wallets: {
     banking: number
     tradingCash: number
@@ -82,9 +82,9 @@ export function buildAggregatedPortfolioSnapshot({
   const tradingCash = decimalToNumber(toDecimal(tradingPortfolio?.balance.cashBalance ?? 0))
   const lockedTrading = decimalToNumber(toDecimal(tradingPortfolio?.balance.lockedCash ?? 0))
   const availableTrading = decimalToNumber(toDecimal(tradingPortfolio?.balance.availableCash ?? 0))
-  const secondaryEquity = decimalToNumber(toDecimal(tradingPortfolio?.summary.totalEquity ?? 0))
+  const totalInvested = decimalToNumber(toDecimal(tradingPortfolio?.summary.holdingsValue ?? 0))
   const totalCash = decimalToNumber(toDecimal(normalizedBanking).plus(tradingCash))
-  const globalNetWorth = decimalToNumber(toDecimal(normalizedBanking).plus(secondaryEquity))
+  const globalNetWorth = decimalToNumber(toDecimal(totalCash).plus(totalInvested))
 
   const errors = {
     banking: getErrorMessage(bankingError, 'Failed to load the banking wallet.'),
@@ -94,7 +94,7 @@ export function buildAggregatedPortfolioSnapshot({
   return {
     globalNetWorth,
     totalCash,
-    secondaryEquity,
+    totalInvested,
     wallets: {
       banking: normalizedBanking,
       tradingCash,

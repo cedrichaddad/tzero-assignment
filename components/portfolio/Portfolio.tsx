@@ -238,7 +238,7 @@ export default function Portfolio() {
   const {
     globalNetWorth,
     totalCash,
-    secondaryEquity,
+    totalInvested,
     wallets,
     holdings,
     openOrders,
@@ -308,21 +308,21 @@ export default function Portfolio() {
             eyebrow="Global Overview"
             title="Global Net Worth"
             value={globalNetWorth}
-            description="Banking cash plus total secondary-market equity."
+            description="Combined cash plus marked-to-market value of active positions."
             loading={isLoading}
           />
           <MetricCard
             eyebrow="Liquidity"
             title="Total Cash"
             value={totalCash}
-            description="Combined cash across banking and trading wallets."
+            description="Combined purchasing power across banking and trading wallets."
             loading={isLoading}
           />
           <MetricCard
-            eyebrow="Trading"
-            title="Secondary Market Equity"
-            value={secondaryEquity}
-            description="Trading wallet cash plus marked-to-market positions."
+            eyebrow="Positions"
+            title="Total Invested"
+            value={totalInvested}
+            description="Current market value of all active secondary-market positions."
             loading={isLoading}
           />
         </Box>
