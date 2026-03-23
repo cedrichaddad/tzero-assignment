@@ -230,6 +230,21 @@ function ensureMarketMakerLiquidityForAsset(asset: TradingAsset, database: Datab
 }
 
 function expireStaleOrdersInternal(database: DatabaseClient, nowIso: string) {
+  const staleOrderExists = database.prepare(
+    `SELECT 1
+     FROM trading_orders
+     WHERE status IN ('New', 'Pending', 'PartiallyFilled')
+       AND (
+         (time_in_force = 'day' AND datetime(created_at) < datetime(?, 'start of day'))
+         OR (time_in_force = 'gtd' AND good_til_date IS NOT NULL AND datetime(good_til_date) < datetime(?))
+       )
+     LIMIT 1`
+  ).get(nowIso, nowIso) as { 1: number } | undefined
+
+  if (!staleOrderExists) {
+    return
+  }
+
   database.prepare(
     `UPDATE trading_orders
      SET status = 'Cancelled', updated_at = ?

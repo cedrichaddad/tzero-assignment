@@ -19,14 +19,27 @@ This implementation delivers a transaction-safe secondary marketplace on top of 
 5. **Lazy expiry and practical STP**
    `day` and `gtd` orders are lazily expired on each trading read/mutation, which prevents stale orders from matching without introducing a scheduler. Self-crossing orders are rejected with a clear error. Real trading venues typically implement configurable self-trade prevention modes such as cancel-newest or cancel-resting; for this assessment, reject-incoming is the safest and clearest policy.
 
+6. **Unified portfolio with frontend aggregation**
+   The banking ledger and the secondary trading ledger remain isolated on the backend, but the portfolio page now aggregates both on the client into one global net-worth view. This removes the earlier UX mismatch where the top-level portfolio summary could show zero while the trading account held real equity.
+
+7. **Read-first polling optimization**
+   Trading portfolio polling no longer issues a stale-order cancellation write on every request. The expiry path now performs a fast `SELECT 1 ... LIMIT 1` check and only mutates `trading_orders` when stale rows actually exist, which materially reduces SQLite write pressure under SWR polling.
+
 ## What Was Built
 - API routes for asset listing, asset detail, order placement, order cancellation, portfolio, and order/trade history.
 - Trading domain layer for catalog lookup, fixed-point math, market-maker seeding, expiry, order-book aggregation, settlement, and portfolio projections.
 - Refactored matcher that returns exact fills, avoids same-user matches, preserves sell-side average cost, and normalizes terminal fills to `Filled`.
 - Marketplace listing page with search, category filtering, live best bid/ask/spread metadata, and loading/error/empty states.
 - Asset detail page with charting, live order book, order ticket with review modal, polling, trading snapshot, and per-asset activity tables.
-- Portfolio integration via a distinct Trading Account section that sits alongside the existing banking/investment view.
+- Portfolio integration via a unified net-worth view with explicit Banking Wallet and Trading Wallet cards, live trading activity, safe order cancellation feedback, and preserved ledger segregation.
 - Vitest coverage for the core trading math, locking, expiry, idempotency, self-trade prevention, and route behavior.
+
+## Ledger Segregation & The Missing Bridge
+During the integration of the Secondary Trading environment, I kept strict ledger isolation between Primary Banking and Secondary Trading.
+
+Why? In production fintech ecosystems, moving cash from a banking entity to a broker-dealer entity requires compliance checks and typically operates on a T+1 settlement cycle. Rather than building a fake instant-transfer flow, the UI explicitly separates the Banking Wallet from the Trading Wallet and exposes a disabled `Transfer from Banking (T+1)` control to acknowledge the intended workflow.
+
+For the scope of this assessment, trading accounts rely on the seeded signup cash for buying power, while the Banking deposit experience remains wired strictly to the primary cash ledger. The frontend aggregates both ledgers to present a mathematically correct global net-worth view without violating that boundary.
 
 ## What I Would Improve Next
 - Replace polling with websockets or server-sent events for lower latency and less server churn.

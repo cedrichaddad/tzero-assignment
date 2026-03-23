@@ -1,13 +1,12 @@
 'use client'
 
-import useSWR from 'swr'
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
   Grid,
   Paper,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -15,188 +14,259 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
-import api from '@/lib/api'
 import { formatCurrency, formatNumber } from '@/lib/investmentUtils'
-import type { TradingPortfolioResponse } from '@/lib/tradingTypes'
+import type { TradingHoldingView, TradingOrderView, TradingTradeView } from '@/lib/tradingTypes'
 
-const fetcher = async (url: string) => {
-  const response = await api.get<TradingPortfolioResponse>(url)
-  return response.data
+type TradingAccountSectionProps = {
+  holdings: TradingHoldingView[]
+  openOrders: TradingOrderView[]
+  recentTrades: TradingTradeView[]
+  isLoading: boolean
+  isCancellingOrderId: string | null
+  onCancelOrder: (orderId: string) => Promise<void>
 }
 
-export default function TradingAccountSection() {
-  const { data, error, isLoading, mutate } = useSWR('/trading/portfolio', fetcher, {
-    refreshInterval: 4000,
-    dedupingInterval: 2000,
-    focusThrottleInterval: 3000,
-    keepPreviousData: true,
-  })
-
-  const handleCancelOrder = async (orderId: string) => {
-    await api.delete(`/trading/orders/${orderId}`)
-    void mutate()
-  }
-
+function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <Box sx={{ mt: 4 }}>
-      <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700, mb: 2 }}>
-        Trading Account
-      </Typography>
+    <Box>
+      {Array.from({ length: rows }).map((_, index) => (
+        <Skeleton
+          key={index}
+          variant="rounded"
+          height={40}
+          sx={{ mb: index === rows - 1 ? 0 : 1, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.08)' }}
+        />
+      ))}
+    </Box>
+  )
+}
 
-      {error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error.response?.data?.error ?? 'Failed to load trading account.'}
-        </Alert>
-      ) : null}
+const tableCellSx = {
+  color: '#ffffff',
+  borderColor: 'rgba(255,255,255,0.08)',
+}
 
-      {isLoading && !data ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <CircularProgress />
-        </Paper>
-      ) : null}
+const tableHeadSx = {
+  color: '#8a96a8',
+  borderColor: 'rgba(255,255,255,0.08)',
+  fontWeight: 600,
+}
 
-      {data ? (
-        <>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Typography sx={{ color: '#888888', mb: 1 }}>Trading Cash</Typography>
-                <Typography variant="h4" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                  {formatCurrency(data.balance.cashBalance)}
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Typography sx={{ color: '#888888', mb: 1 }}>Locked Cash</Typography>
-                <Typography variant="h4" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                  {formatCurrency(data.balance.lockedCash)}
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Typography sx={{ color: '#888888', mb: 1 }}>Total Trading Equity</Typography>
-                <Typography variant="h4" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                  {formatCurrency(data.summary.totalEquity)}
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+export default function TradingAccountSection({
+  holdings,
+  openOrders,
+  recentTrades,
+  isLoading,
+  isCancellingOrderId,
+  onCancelOrder,
+}: TradingAccountSectionProps) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Paper
+        sx={{
+          p: { xs: 2.5, md: 3 },
+          borderRadius: 4,
+          backgroundColor: '#121a24',
+          border: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, mb: 0.5 }}>
+          Secondary Marketplace Holdings
+        </Typography>
+        <Typography sx={{ color: '#8a96a8', mb: 2.5 }}>
+          Live positions marked to the latest executable market data.
+        </Typography>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} lg={7}>
-              <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, mb: 2 }}>
-                  Holdings
-                </Typography>
-                {data.holdings.length ? (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Asset</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Shares</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Avg Cost</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Market Value</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.holdings.map((holding) => (
-                        <TableRow key={holding.symbol}>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>
-                            {holding.title}
-                          </TableCell>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>
-                            {formatNumber(holding.shares)}
-                          </TableCell>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>
-                            {formatCurrency(holding.avgCost)}
-                          </TableCell>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>
-                            {formatCurrency(holding.marketValue)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <Typography sx={{ color: '#888888' }}>No trading holdings yet.</Typography>
-                )}
-              </Paper>
+        {isLoading && !holdings.length ? (
+          <TableSkeleton rows={5} />
+        ) : holdings.length ? (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={tableHeadSx}>Asset</TableCell>
+                <TableCell sx={tableHeadSx}>Shares</TableCell>
+                <TableCell sx={tableHeadSx}>Avg Cost</TableCell>
+                <TableCell sx={tableHeadSx}>Market Value</TableCell>
+                <TableCell sx={tableHeadSx}>Unrealized P&amp;L</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {holdings.map((holding) => (
+                <TableRow key={holding.symbol}>
+                  <TableCell sx={tableCellSx}>
+                    <Typography sx={{ fontWeight: 600 }}>{holding.title}</Typography>
+                    <Typography variant="body2" sx={{ color: '#8a96a8' }}>
+                      {holding.symbol}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={tableCellSx}>{formatNumber(holding.shares)}</TableCell>
+                  <TableCell sx={tableCellSx}>{formatCurrency(holding.avgCost)}</TableCell>
+                  <TableCell sx={tableCellSx}>{formatCurrency(holding.marketValue)}</TableCell>
+                  <TableCell
+                    sx={{
+                      ...tableCellSx,
+                      color: holding.unrealizedPnL >= 0 ? '#00d68f' : '#ff7a7a',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {formatCurrency(holding.unrealizedPnL)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Typography sx={{ color: '#8a96a8' }}>
+            No secondary-market holdings yet. Filled trades will appear here automatically.
+          </Typography>
+        )}
+      </Paper>
 
-              <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, mb: 2 }}>
-                  Recent Trades
-                </Typography>
-                {data.recentTrades.length ? (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Asset</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Side</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Price</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Quantity</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.recentTrades.map((trade) => (
-                        <TableRow key={trade.id}>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>{trade.title}</TableCell>
-                          <TableCell sx={{ color: trade.side === 'buy' ? '#00FF88' : '#ff6b6b', borderColor: 'rgba(255,255,255,0.08)' }}>
-                            {trade.side.toUpperCase()}
-                          </TableCell>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>{formatCurrency(trade.price)}</TableCell>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>{formatNumber(trade.quantity)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <Typography sx={{ color: '#888888' }}>No recent trading activity.</Typography>
-                )}
-              </Paper>
-            </Grid>
+      <Grid container spacing={3}>
+        <Grid item xs={12} lg={5}>
+          <Paper
+            sx={{
+              p: { xs: 2.5, md: 3 },
+              height: '100%',
+              borderRadius: 4,
+              backgroundColor: '#121a24',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, mb: 0.5 }}>
+              Open Orders
+            </Typography>
+            <Typography sx={{ color: '#8a96a8', mb: 2.5 }}>
+              Active orders continue to lock cash or shares until they fill or are cancelled.
+            </Typography>
 
-            <Grid item xs={12} lg={5}>
-              <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, mb: 2 }}>
-                  Open Orders
-                </Typography>
-                {data.openOrders.length ? (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Asset</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Side</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Remaining</TableCell>
-                        <TableCell sx={{ color: '#888888', borderColor: 'rgba(255,255,255,0.08)' }}>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.openOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>{order.title}</TableCell>
-                          <TableCell sx={{ color: order.side === 'buy' ? '#00FF88' : '#ff6b6b', borderColor: 'rgba(255,255,255,0.08)' }}>
-                            {order.side.toUpperCase()}
-                          </TableCell>
-                          <TableCell sx={{ color: '#ffffff', borderColor: 'rgba(255,255,255,0.08)' }}>{formatNumber(order.remainingQuantity)}</TableCell>
-                          <TableCell sx={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                            <Button size="small" color="inherit" onClick={() => void handleCancelOrder(order.id)}>
-                              Cancel
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <Typography sx={{ color: '#888888' }}>No active orders.</Typography>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
-        </>
-      ) : null}
+            {isLoading && !openOrders.length ? (
+              <TableSkeleton rows={4} />
+            ) : openOrders.length ? (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={tableHeadSx}>Asset</TableCell>
+                    <TableCell sx={tableHeadSx}>Side</TableCell>
+                    <TableCell sx={tableHeadSx}>Remaining</TableCell>
+                    <TableCell sx={tableHeadSx}>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {openOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell sx={tableCellSx}>
+                        <Typography sx={{ fontWeight: 600 }}>{order.title}</Typography>
+                        <Typography variant="body2" sx={{ color: '#8a96a8' }}>
+                          {formatCurrency(order.price)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          ...tableCellSx,
+                          color: order.side === 'buy' ? '#00d68f' : '#ff7a7a',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {order.side}
+                      </TableCell>
+                      <TableCell sx={tableCellSx}>{formatNumber(order.remainingQuantity)}</TableCell>
+                      <TableCell sx={tableCellSx}>
+                        <Button
+                          size="small"
+                          color="inherit"
+                          disabled={isCancellingOrderId === order.id}
+                          onClick={() => void onCancelOrder(order.id)}
+                          sx={{
+                            minWidth: 92,
+                            color: '#d7dbe2',
+                            borderColor: 'rgba(255,255,255,0.18)',
+                          }}
+                          variant="outlined"
+                        >
+                          {isCancellingOrderId === order.id ? <CircularProgress size={18} color="inherit" /> : 'Cancel'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Typography sx={{ color: '#8a96a8' }}>No active orders.</Typography>
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} lg={7}>
+          <Paper
+            sx={{
+              p: { xs: 2.5, md: 3 },
+              height: '100%',
+              borderRadius: 4,
+              backgroundColor: '#121a24',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, mb: 0.5 }}>
+              Recent Trades
+            </Typography>
+            <Typography sx={{ color: '#8a96a8', mb: 2.5 }}>
+              Executions update automatically as the trading book moves.
+            </Typography>
+
+            {isLoading && !recentTrades.length ? (
+              <TableSkeleton rows={4} />
+            ) : recentTrades.length ? (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={tableHeadSx}>Asset</TableCell>
+                    <TableCell sx={tableHeadSx}>Side</TableCell>
+                    <TableCell sx={tableHeadSx}>Price</TableCell>
+                    <TableCell sx={tableHeadSx}>Quantity</TableCell>
+                    <TableCell sx={tableHeadSx}>Time</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentTrades.map((trade) => (
+                    <TableRow key={trade.id}>
+                      <TableCell sx={tableCellSx}>
+                        <Typography sx={{ fontWeight: 600 }}>{trade.title}</Typography>
+                        <Typography variant="body2" sx={{ color: '#8a96a8' }}>
+                          {trade.symbol}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          ...tableCellSx,
+                          color: trade.side === 'buy' ? '#00d68f' : '#ff7a7a',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {trade.side}
+                      </TableCell>
+                      <TableCell sx={tableCellSx}>{formatCurrency(trade.price)}</TableCell>
+                      <TableCell sx={tableCellSx}>{formatNumber(trade.quantity)}</TableCell>
+                      <TableCell sx={tableCellSx}>
+                        {new Date(trade.createdAt).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Typography sx={{ color: '#8a96a8' }}>No recent trading activity.</Typography>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   )
 }

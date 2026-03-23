@@ -169,6 +169,47 @@ describe('trading service', () => {
     expect(result.order.status).toBe('Pending')
   })
 
+  it('skips stale-order writes when no stale orders exist', () => {
+    seedUser('idle-user', 'idle-user@example.com', 1000)
+
+    const originalPrepare = db.prepare.bind(db)
+    let staleUpdatePrepareCount = 0
+    const prepareSpy = vi.spyOn(db, 'prepare')
+
+    prepareSpy.mockImplementation(((sql: string) => {
+      if (sql.includes("UPDATE trading_orders") && sql.includes("SET status = 'Cancelled'")) {
+        staleUpdatePrepareCount += 1
+      }
+
+      return originalPrepare(sql)
+    }) as typeof db.prepare)
+
+    try {
+      getTradingPortfolio('idle-user')
+      expect(staleUpdatePrepareCount).toBe(0)
+    } finally {
+      prepareSpy.mockRestore()
+    }
+  })
+
+  it('expires stale gtd orders lazily on portfolio reads', () => {
+    seedUser('gtd-user', 'gtd-user@example.com', 1000)
+    const now = new Date().toISOString()
+    const pastDate = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+    db.prepare(
+      `INSERT INTO trading_orders
+       (id, client_order_id, user_id, symbol, side, quantity, remaining_quantity, price, status, time_in_force, good_til_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('gtd-order', 'gtd-order', 'gtd-user', 'NVMT', 'buy', 5, 5, 10, 'Pending', 'gtd', pastDate, now, now)
+
+    const portfolio = getTradingPortfolio('gtd-user')
+    const staleRow = db.prepare('SELECT status FROM trading_orders WHERE id = ?').get('gtd-order') as { status: string }
+
+    expect(staleRow.status).toBe('Cancelled')
+    expect(portfolio.openOrders).toHaveLength(0)
+  })
+
   it('releases locked cash when an open order is cancelled', () => {
     seedUser('cancel-user', 'cancel-user@example.com', 1000)
 
